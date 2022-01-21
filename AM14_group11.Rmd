@@ -1,0 +1,262 @@
+---
+title: "AM14 Assignment 1"
+author: "Group 11"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+      number_sections: true
+      highlight: haddock
+      theme: spacelab
+      toc: yes
+      toc_depth: 2
+      toc_float:
+        collapsed: false
+---
+
+
+```{r load libraries}
+library(dplyr) #package for data manipulation
+library(ggplot2) #package for plots
+library(tidyverse) #the usual stuff: dplyr, readr, and other goodies
+library(openxlsx)
+library(lubridate)
+library(janitor) #package to visualize results of machine learning tools
+library(readxl) #package to read xlsx
+library(moments)
+library(ggpubr)
+```
+
+```{r load data}
+PS1_monthly <- read_excel("/Users/estheroit/Documents/PG/LBS/AM14 Empirical Finance/Assignments/PS1_Monthly.xlsx")
+PS1_daily <- read_excel("/Users/estheroit/Documents/PG/LBS/AM14 Empirical Finance/Assignments/PS1_Daily.xlsx",
+                        sheet = "HPR_daily", skip = 1)
+```
+
+```{r calcualte total return index}
+MSFT_month <- PS1_monthly %>% 
+  filter(TICKER == "MSFT") %>% 
+  mutate(date = ymd(date)) %>% 
+  arrange(date) %>% 
+  mutate(LRET = log(1+RET),
+         return_div = cumprod(1+RET),
+         snpreturn = cumprod(1+sprtrn),
+         return_nodiv = cumprod(1+RETX)
+         ) %>% 
+  select(date, TICKER, RET, LRET, sprtrn, return_div, return_nodiv, snpreturn) 
+
+
+GE_month <- PS1_monthly %>% 
+  filter(TICKER == "GE") %>% 
+  mutate(date = ymd(date)) %>% 
+  arrange(date) %>% 
+  mutate(LRET = log(1+RET),
+         return_div = cumprod(1+RET),
+         snpreturn = cumprod(1+sprtrn),
+         return_nodiv = cumprod(1+RETX)
+         ) %>% 
+  select(date, TICKER, RET, LRET, sprtrn, return_div, return_nodiv, snpreturn)
+```
+
+
+```{r plot return index,fig.width=10,fig.height=8}
+plot1 <- MSFT_month %>% pivot_longer(cols = return_div:snpreturn, 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = date, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET", 
+                                "Total return index for RETX", 
+                                "Total return index for S&P500"),
+                     values = c("darkblue","orange","red")) +
+  scale_y_continuous(limits = c(0,120)) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot1 + labs(title = "MSFT outperformed the S&P500 and skyrocketed twice during the past 25 years",
+       subtitle = "The total return index for MSFT calculated from monthly RET and RETX, compared with that of the S&P500 index")
+```
+
+
+```{r plot return index,fig.width=10,fig.height=8}
+plot2 <- GE_month %>% 
+  pivot_longer(cols = return_div:snpreturn, 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = date, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET", 
+                                "Total return index for RETX", 
+                                "Total return index for S&P500"),
+                     values = c("darkblue","orange","red")) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot2 +
+  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
+       subtitle = "The total return index for GE calculated from monthly RET and RETX, compared with that of the S&P500 index")
+```
+
+```{r distribution}
+MSFT_month %>% group_by(TICKER) %>% 
+  summarise(mean = mean(RET),
+            variance = var(RET),
+            skewness = skewness(RET),
+            kurtosis = kurtosis(RET))
+
+
+MSFT_month %>% group_by(TICKER) %>% 
+  summarise(mean = mean(LRET),
+            variance = var(LRET),
+            skewness = skewness(LRET),
+            kurtosis = kurtosis(LRET))
+```
+
+
+```{r plot distribution,fig.width=8,fig.height=5}
+plot3 <- MSFT_month %>% pivot_longer(cols = c("RET","LRET"),
+                            names_to = "index_type",
+                            values_to = "index") %>% 
+  ggplot(aes(x = index)) +
+  geom_histogram(bins = 50) +
+  scale_x_continuous(limits = c(-0.5,0.5)) +
+  facet_wrap(~index_type, ncol = 1) +
+  theme_minimal()
+
+plot3 +
+  labs(title = "Distribution of monthly return period index for MSFT in normal and log form")
+
+```
+```{r}
+MSFT_day <- PS1_daily %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  arrange(DATE) %>% 
+  mutate(LRET = log(1+MSFT),
+         return_div = cumprod(1+MSFT),
+         snpreturn = cumprod(1+SPRTRN)
+         ) %>% 
+  select(DATE, MSFT, LRET, SPRTRN, return_div,snpreturn) %>% 
+  rename(RET = MSFT)
+
+
+GE_day <- PS1_daily %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  arrange(DATE) %>% 
+  mutate(LRET = log(1+GE),
+         return_div = cumprod(1+GE),
+         snpreturn = cumprod(1+SPRTRN)
+         ) %>% 
+  select(DATE, GE, LRET, SPRTRN, return_div,snpreturn) %>% 
+  rename(RET = GE)
+```
+
+
+```{r,fig.height=8,fig.width=10}
+plot4 <- MSFT_day %>% pivot_longer(cols = c("return_div","snpreturn"), 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = DATE, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET", 
+                                "Total return index for S&P500"),
+                     values = c("darkblue","red")) +
+  scale_y_continuous(limits = c(0,120)) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot4 + labs(title = "MSFT outperformed the S&P500 and skyrocketed twice during the past 25 years",
+       subtitle = "The total return index for MSFT calculated from daily RET, compared with that of the S&P500 index")
+```
+```{r,fig.height=8,fig.width=10}
+plot5 <- GE_day %>% pivot_longer(cols = c("return_div","snpreturn"), 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = DATE, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET",
+                                "Total return index for S&P500"),
+                     values = c("darkblue","red")) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot5 +
+  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
+       subtitle = "The total return index for GE calculated from daily RET and RETX, compared with that of the S&P500 index")
+```
+
+
+```{r,fig.width=10,fig.height=8}
+
+plot_msftmd <- ggarrange(
+  plot1, plot4,
+  labels = c("Monthly","    Daily"),
+  legend = "right",
+  ncol = 1,
+  label.x = 0.08,
+  vjust = 5,
+  font.label = list(size = 10)
+)
+
+annotate_figure(plot_msftmd, top = text_grob("Total return indices calculated from monthly and daily return period indices for MSFT", 
+               color = "black", face = "bold", size = 14))
+```
+```{r distribution daily}
+MSFT_day %>% 
+  mutate(TICKER = rep("MSFT",nrow(MSFT_day))) %>% 
+  group_by(TICKER) %>% 
+  summarise(mean = mean(RET),
+            variance = var(RET),
+            skewness = skewness(RET),
+            kurtosis = kurtosis(RET))
+
+
+MSFT_day %>% 
+  mutate(TICKER = rep("MSFT",nrow(MSFT_day))) %>% 
+  group_by(TICKER) %>% 
+  summarise(mean = mean(LRET),
+            variance = var(LRET),
+            skewness = skewness(LRET),
+            kurtosis = kurtosis(LRET))
+```
+
+```{r}
+plot6 <- MSFT_day %>% pivot_longer(cols = c("RET","LRET"),
+                            names_to = "index_type",
+                            values_to = "index") %>% 
+  ggplot(aes(x = index)) +
+  geom_histogram(bins = 100) +
+  scale_x_continuous(limits = c(-0.5,0.5)) +
+  facet_wrap(~index_type, ncol = 1) +
+  theme_minimal()
+
+plot6 +
+    labs(title = "Distribution of daily return period index for MSFT in normal and log form")
+```
+
+
+```{r,fig.height=8,fig.width=10}
+plot_msft_distmd <- ggarrange(
+  plot3, plot6, 
+  ncol = 1,
+  labels = c("Monthly","   Daily"),
+  legend = "bottom",
+  label.x = 0.08,
+  vjust = 5,
+  font.label = list(size = 10)
+)
+
+annotate_figure(plot_msft_distmd, top = text_grob("Distribution of monthly and daily return period index for MSFT in normal and log form", 
+               color = "black", face = "bold", size = 14))
+```
+
