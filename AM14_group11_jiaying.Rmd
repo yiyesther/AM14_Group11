@@ -34,8 +34,8 @@ Before starting analysis, we load the CRSP data. (Q1 & Q4)
 #PS1_daily <- read_excel("/Users/estheroit/Documents/PG/LBS/AM14 Empirical Finance/Assignments/PS1_Daily.xlsx",
                        # sheet = "HPR_daily", skip = 1)
 
-PS1_monthly <- read_excel("/Users/jyc/Desktop/finance/Assignments/PS1_Monthly.xlsx")
-PS1_daily <- read_excel("/Users/jyc/Desktop/finance/Assignments/PS1_Daily.xlsx", sheet = "HPR_daily", skip = 1)
+PS1_monthly <- read_excel("PS1_Monthly.xlsx")
+PS1_daily <- read_excel("PS1_Daily.xlsx", sheet = "HPR_daily", skip = 1)
 
 ```
 
@@ -97,20 +97,19 @@ plot1 <- MSFT_month %>% pivot_longer(cols = return_div:snpreturn,
         plot.subtitle = element_text(size = 13))
 
 plot1 + labs(title = "MSFT outperformed the S&P500 and skyrocketed twice during the past 25 years",
-       subtitle = "The total return index for MSFT calculated from RET and RETX, compared with that of the S&P500 index")
+       subtitle = "The total return index for MSFT calculated from monthly RET and RETX, compared with that of the S&P500 index")
 ```
 
 ```{r plot return index GE,fig.width=10,fig.height=8,message=FALSE,warning=FALSE}
 #plot total return index of GE 
-GE_month %>% pivot_longer(cols = return_div:snpreturn, 
+plot2 <- GE_month %>% 
+  pivot_longer(cols = return_div:snpreturn, 
                             names_to = "total_return", 
                             values_to = "index") %>% 
   ggplot(aes(x = date, y = index, color = total_return)) +
   geom_line() +
   theme_minimal() +
-  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
-       subtitle = "The total return index for GE calculated from RET and RETX, compared with that of the S&P500 index",
-       x = "Date", y = "Compound return index") +
+  labs(x = "Date", y = "Compound return index") +
   scale_color_manual(name = "Return index",
                      labels = c("Total return index for RET", 
                                 "Total return index for RETX", 
@@ -118,6 +117,10 @@ GE_month %>% pivot_longer(cols = return_div:snpreturn,
                      values = c("darkblue","orange","red")) +
   theme(plot.title = element_text(size=15, face = "bold"),
         plot.subtitle = element_text(size = 13))
+
+plot2 +
+  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
+       subtitle = "The total return index for GE calculated from monthly RET and RETX, compared with that of the S&P500 index")
 ```
 
 ## Q3
@@ -130,14 +133,17 @@ Both kurtosises of the distribution of returns are over 5, which are very high (
 
 ```{r distribution,message=FALSE,warning=FALSE}
 # Q3-calculate the MEAN , VARIANCE, SKEWNESS and KURTOSIS of RET and LRET 
-monthly_simple<-MSFT_month %>% group_by(TICKER) %>% 
+monthly_simple <- MSFT_month %>% 
+  group_by(TICKER) %>% 
   summarise(mean = mean(RET),
             variance = var(RET),
             skewness = skewness(RET),
             kurtosis = kurtosis(RET))
+
 monthly_simple$TICKER[ monthly_simple$TICKER == "MSFT"] <-"MSFT_monthly_simple"
 
-monthly_log <-MSFT_month %>% group_by(TICKER) %>% 
+monthly_log <- MSFT_month %>% 
+  group_by(TICKER) %>% 
   summarise(mean = mean(LRET),
             variance = var(LRET),
             skewness = skewness(LRET),
@@ -156,18 +162,20 @@ monthly_distribution
 
 ```{r plot distribution,fig.width=8,fig.height=5,message=FALSE,warning=FALSE}
 # plot the histogram of two distributions of returns
-plot3 <- MSFT_month %>% pivot_longer(cols = c("RET","LRET"),
+plot3 <- MSFT_month %>% 
+  pivot_longer(cols = c("RET","LRET"),
                             names_to = "index_type",
                             values_to = "index") %>% 
   ggplot(aes(x = index)) +
  # geom_histogram(bins = 50) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
- geom_density(alpha=.2, fill="#FF6666") +
+  geom_density(alpha=.2, fill="#FF6666") +
   scale_x_continuous(limits = c(-0.5,0.5)) +
-  facet_wrap(~index_type, ncol = 1)+
-  ggtitle("Comparison of distribution of monthly simple return and log return of Microsoft")
+  facet_wrap(~index_type, ncol = 1) +
+  theme_minimal()
 
-plot3
+plot3 +
+  labs(title = "Distribution of monthly return period index for MSFT in normal and log form")
 
 
 ```
@@ -218,7 +226,7 @@ plot4 <- MSFT_day %>% pivot_longer(cols = c("return_div","snpreturn"),
         plot.subtitle = element_text(size = 13))
 
 plot4 + labs(title = "MSFT outperformed the S&P500 and skyrocketed twice during the past 25 years",
-       subtitle = "The total return index for MSFT calculated from RET, compared with that of the S&P500 index")
+       subtitle = "The total return index for MSFT calculated from daily RET, compared with that of the S&P500 index")
 ```
 
 ```{r plot GE and sp500 total return index,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
@@ -229,9 +237,7 @@ plot5 <- GE_day %>% pivot_longer(cols = c("return_div","snpreturn"),
   ggplot(aes(x = DATE, y = index, color = total_return)) +
   geom_line() +
   theme_minimal() +
-  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
-       subtitle = "The total return index for GE calculated from RET and RETX, compared with that of the S&P500 index",
-       x = "Date", y = "Compound return index") +
+  labs(x = "Date", y = "Compound return index") +
   scale_color_manual(name = "Return index",
                      labels = c("Total return index for RET",
                                 "Total return index for S&P500"),
@@ -239,7 +245,9 @@ plot5 <- GE_day %>% pivot_longer(cols = c("return_div","snpreturn"),
   theme(plot.title = element_text(size=15, face = "bold"),
         plot.subtitle = element_text(size = 13))
 
-plot5
+plot5 +
+  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
+       subtitle = "The total return index for GE calculated from daily RET and RETX, compared with that of the S&P500 index")
 ```
 
 ## Q5
@@ -253,21 +261,22 @@ Based on the line plots, we can conclude that there is no difference between mon
 plot_msftmd <- ggarrange(
   plot1, plot4,
   labels = c("Monthly","    Daily"),
-  legend = "bottom",
+  legend = "right",
   ncol = 1,
   label.x = 0.08,
-  vjust = 2,
+  vjust = 5,
   font.label = list(size = 10)
 )
 
-plot_msftmd
+annotate_figure(plot_msftmd, top = text_grob("Total return indices calculated from monthly and daily return period indices for MSFT", 
+               color = "black", face = "bold", size = 14))
 ```
 
 Then we look into the distribution of simple return and log return of MSFT on a daily basis.
 
 ```{r distribution daily,message=FALSE,warning=FALSE}
 # Q6-calculate the MEAN , VARIANCE, SKEWNESS and KURTOSIS of RET and LRET 
-daily_simple <-MSFT_day %>% 
+daily_simple <- MSFT_day %>% 
   mutate(TICKER = rep("MSFT",nrow(MSFT_day))) %>% 
   group_by(TICKER) %>% 
   summarise(mean = mean(RET),
@@ -319,29 +328,33 @@ MSFT_day_longer<-  MSFT_day %>%
                             names_to = "index_type",
                             values_to = "index") 
 
-  plot6 <- ggplot(MSFT_day_longer,aes(x = index)) +
+plot6 <- ggplot(MSFT_day_longer,aes(x = index)) +
 #  geom_histogram(bins = 50) +
- geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
- geom_density(alpha=.2, fill="#FF6666")+
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 100)+
+  geom_density(alpha=.2, fill="#FF6666")+
   scale_x_continuous(limits = c(-0.5,0.5)) +
-  facet_wrap(~index_type, ncol = 1)+
-  ggtitle("Comparison of distribution of daily simple return and log return of Microsoft")
+  facet_wrap(~index_type, ncol = 1) +
+  theme_minimal()
 
-plot6
+plot6 +
+    labs(title = "Comparison of distribution of daily simple return and log return of Microsoft")
 
 ```
 
 ```{r compare monthly and daily simple and log return,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
 #compare monthly and daily simple and log return
-ggarrange(
+plot_msft_distmd <- ggarrange(
   plot3, plot6, 
   ncol = 1,
   labels = c("Monthly","   Daily"),
   legend = "bottom",
   label.x = 0.08,
-  vjust = 2,
+  vjust = 5,
   font.label = list(size = 10)
 )
+
+annotate_figure(plot_msft_distmd, top = text_grob("Distribution of monthly and daily return period index for MSFT in normal and log form", 
+               color = "black", face = "bold", size = 14))
 
 ```
 
@@ -352,17 +365,18 @@ A standard normal distribution has a mean of 0, variance of 1, skewness of 0 and
 ```{r compare with normal distribution,fig.width=10,fig.height=8,message=FALSE,warning=FALSE}
 # compare with normal distribution
 plot7 <- ggplot(MSFT_day_longer,aes(x = index)) +
- geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
   #geom_density(alpha=.2,fill="#FF6666",colour="#FF6666")+
   scale_x_continuous(limits = c(-0.5,0.5)) +
   stat_function(colour="#FF6666",alpha=3,
 		fun = dnorm, 
 		args = with(MSFT_day_longer,c(mean = mean(index), sd = sd(index)))
 	) + 
-  facet_wrap(~index_type, ncol = 1)+
-  ggtitle("Comparison of distribution of daily simple return and log return of Microsoft with normal distribution")
+  facet_wrap(~index_type, ncol = 1) +
+  theme_minimal()
 
-plot7
+plot7 +
+  labs(title = "Comparison of distribution of daily simple return and log return of Microsoft with normal distribution")
 ```
 
 # 
