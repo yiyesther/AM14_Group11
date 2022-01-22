@@ -1,0 +1,368 @@
+---
+title: "AM14 Assignment 1"
+author: "Group 11"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+      number_sections: true
+      highlight: haddock
+      theme: spacelab
+      toc: yes
+      toc_depth: 2
+      toc_float:
+        collapsed: false
+---
+
+```{r load libraries,include=FALSE,message=FALSE,warning=FALSE}
+library(dplyr) #package for data manipulation
+library(ggplot2) #package for plots
+library(tidyverse) #the usual stuff: dplyr, readr, and other goodies
+library(openxlsx)
+library(lubridate)
+library(janitor) #package to visualize results of machine learning tools
+library(readxl) #package to read xlsx
+library(moments)
+library(ggpubr)
+```
+
+# Q1 & 4 Load the data
+
+Before starting analysis, we load the CRSP data. (Q1 & Q4)
+
+```{r load data,message=FALSE,warning=FALSE}
+#PS1_monthly <- read_excel("/Users/estheroit/Documents/PG/LBS/AM14 Empirical Finance/Assignments/PS1_Monthly.xlsx")
+#PS1_daily <- read_excel("/Users/estheroit/Documents/PG/LBS/AM14 Empirical Finance/Assignments/PS1_Daily.xlsx",
+                       # sheet = "HPR_daily", skip = 1)
+
+PS1_monthly <- read_excel("/Users/jyc/Desktop/finance/Assignments/PS1_Monthly.xlsx")
+PS1_daily <- read_excel("/Users/jyc/Desktop/finance/Assignments/PS1_Daily.xlsx", sheet = "HPR_daily", skip = 1)
+
+```
+
+# Q2 & 3 Monthly TRI and LRET
+
+First, we create a total return index with and without dividend for MSFT, GE stocks and S&P 500 Index.(Q2) We also calculated the log returns LRET for MSFT.(Q3)
+
+```{r calcualte total return index+ LRET,message=FALSE,warning=FALSE}
+MSFT_month <- PS1_monthly %>% 
+  filter(TICKER == "MSFT") %>% 
+  mutate(date = ymd(date)) %>% 
+  arrange(date) %>% 
+  mutate(LRET = log(1+RET), # log return 
+         return_div = cumprod(1+RET), # total return index with dividend
+         snpreturn = cumprod(1+sprtrn),# total return index of sp500 
+         return_nodiv = cumprod(1+RETX) # total return index without dividend
+         ) %>% 
+  select(date, TICKER, RET, LRET, sprtrn, return_div, return_nodiv, snpreturn) 
+
+
+GE_month <- PS1_monthly %>% 
+  filter(TICKER == "GE") %>% 
+  mutate(date = ymd(date)) %>% 
+  arrange(date) %>% 
+  mutate(LRET = log(1+RET),
+         return_div = cumprod(1+RET),
+         snpreturn = cumprod(1+sprtrn),
+         return_nodiv = cumprod(1+RETX)
+         ) %>% 
+  select(date, TICKER, RET, LRET, sprtrn, return_div, return_nodiv, snpreturn)
+```
+
+## Q2
+
+How do dividends affect the results?
+
+For both Microsoft and General Electric, we found that total return with dividend is always higher the total return that abstract from dividend payments. Including dividends makes a significant difference in the return of the stocks. The return with dividend has a higher volatility than The total return index is composed of capital gain and dividend gain. The dividend gain is positive and usually accounts for a smaller percentage compared to capital gain.
+
+Microsoft didn't pay its first dividend until 2003, which is indicated by the superposition of total return index for RET and RETX before 2003. And we can observe Microsoft has managed to increase its dividend payout by leaps and bounds since 2005. Despite the negative impact of financial crisis in 2008-09, the percentage of dividend has soared since 2010 as the total return of Microsoft grows dramatically.
+
+For General Electric, we observe from the plot that the dividend gain was growing gradually and steadily from 1980 to 2008. And then the dividend payout dropped due to the financial crisis. According to the news, in 2009, the company slashed its yearly dividend from \$1.24 to \$0.82. Dividends fell even further in 2010. The total return of GE recovered since 2010 and the dividend was also rebounding in 2010-2014.
+
+```{r plot return index MSFT,fig.width=10,fig.height=8,message=FALSE,warning=FALSE}
+#plot total return index of MSFT
+plot1 <- MSFT_month %>% pivot_longer(cols = return_div:snpreturn, 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = date, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET", 
+                                "Total return index for RETX", 
+                                "Total return index for S&P500"),
+                     values = c("darkblue","orange","red")) +
+  scale_y_continuous(limits = c(0,120)) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot1 + labs(title = "MSFT outperformed the S&P500 and skyrocketed twice during the past 25 years",
+       subtitle = "The total return index for MSFT calculated from RET and RETX, compared with that of the S&P500 index")
+```
+
+```{r plot return index GE,fig.width=10,fig.height=8,message=FALSE,warning=FALSE}
+#plot total return index of GE 
+GE_month %>% pivot_longer(cols = return_div:snpreturn, 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = date, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
+       subtitle = "The total return index for GE calculated from RET and RETX, compared with that of the S&P500 index",
+       x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET", 
+                                "Total return index for RETX", 
+                                "Total return index for S&P500"),
+                     values = c("darkblue","orange","red")) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+```
+
+## Q3
+
+Let's take a look at the distribution of the simple return and log return of MSFT.
+
+Based on the histogram and the metrics about the distribution of the simple return and log return of MSFT, we found that the mean, variance and kurtosis of two returns are very similar while the skewnesses have a big difference. For the simple return, the skewness is 0.44, indicating it is moderately right-skewed. For the log return, the skewness is -0.1, indicating it becomes slightly left-skewed and is closer to normal distribution compared to simple return.
+
+Both kurtosises of the distribution of returns are over 5, which are very high (five or more standard deviations from the mean). Usually kurtosis between (-2,2) is acceptable. Distributions with large kurtosis exhibit tail data exceeding the tails of the normal distribution. This indicates that the distribution of monthly return (either simple or log) of MSFT is peaked and possesses thick tails.
+
+```{r distribution,message=FALSE,warning=FALSE}
+# Q3-calculate the MEAN , VARIANCE, SKEWNESS and KURTOSIS of RET and LRET 
+monthly_simple<-MSFT_month %>% group_by(TICKER) %>% 
+  summarise(mean = mean(RET),
+            variance = var(RET),
+            skewness = skewness(RET),
+            kurtosis = kurtosis(RET))
+monthly_simple$TICKER[ monthly_simple$TICKER == "MSFT"] <-"MSFT_monthly_simple"
+
+monthly_log <-MSFT_month %>% group_by(TICKER) %>% 
+  summarise(mean = mean(LRET),
+            variance = var(LRET),
+            skewness = skewness(LRET),
+            kurtosis = kurtosis(LRET))
+
+monthly_log$TICKER[ monthly_log$TICKER == "MSFT"] <-"MSFT_monthly_log"
+
+
+monthly_distribution<-monthly_log %>%
+  rbind(monthly_simple)
+
+monthly_distribution
+  
+
+```
+
+```{r plot distribution,fig.width=8,fig.height=5,message=FALSE,warning=FALSE}
+# plot the histogram of two distributions of returns
+plot3 <- MSFT_month %>% pivot_longer(cols = c("RET","LRET"),
+                            names_to = "index_type",
+                            values_to = "index") %>% 
+  ggplot(aes(x = index)) +
+ # geom_histogram(bins = 50) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
+ geom_density(alpha=.2, fill="#FF6666") +
+  scale_x_continuous(limits = c(-0.5,0.5)) +
+  facet_wrap(~index_type, ncol = 1)+
+  ggtitle("Comparison of distribution of monthly simple return and log return of Microsoft")
+
+plot3
+
+
+```
+
+# Q5 & 6& 7 Daily TRI and LRET
+
+Next, we continue to take a look at daily return of MSFT and GE. Similarly, we calculated the daily total return index and log return. (Q5&6)
+
+```{r daily total return index & return,message=FALSE,warning=FALSE}
+# calculate the daily total return index and log return(Q5&6)
+MSFT_day <- PS1_daily %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  arrange(DATE) %>% 
+  mutate(LRET = log(1+MSFT),
+         return_div = cumprod(1+MSFT),
+         snpreturn = cumprod(1+SPRTRN)
+         ) %>% 
+  select(DATE, MSFT, LRET, SPRTRN, return_div,snpreturn) %>% 
+  rename(RET = MSFT)
+
+
+GE_day <- PS1_daily %>% 
+  mutate(DATE = ymd(DATE)) %>% 
+  arrange(DATE) %>% 
+  mutate(LRET = log(1+GE),
+         return_div = cumprod(1+GE),
+         snpreturn = cumprod(1+SPRTRN)
+         ) %>% 
+  select(DATE, GE, LRET, SPRTRN, return_div,snpreturn) %>% 
+  rename(RET = GE)
+```
+
+```{r plot MSFT and s&p500 total return index,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
+# plot MSFT and s&p500 total return index
+plot4 <- MSFT_day %>% pivot_longer(cols = c("return_div","snpreturn"), 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = DATE, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET", 
+                                "Total return index for S&P500"),
+                     values = c("darkblue","red")) +
+  scale_y_continuous(limits = c(0,120)) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot4 + labs(title = "MSFT outperformed the S&P500 and skyrocketed twice during the past 25 years",
+       subtitle = "The total return index for MSFT calculated from RET, compared with that of the S&P500 index")
+```
+
+```{r plot GE and sp500 total return index,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
+#plot GE and S&P500 total return index
+plot5 <- GE_day %>% pivot_longer(cols = c("return_div","snpreturn"), 
+                            names_to = "total_return", 
+                            values_to = "index") %>% 
+  ggplot(aes(x = DATE, y = index, color = total_return)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "GE followed the marekt trend of S&P500 during the past 25 years",
+       subtitle = "The total return index for GE calculated from RET and RETX, compared with that of the S&P500 index",
+       x = "Date", y = "Compound return index") +
+  scale_color_manual(name = "Return index",
+                     labels = c("Total return index for RET",
+                                "Total return index for S&P500"),
+                     values = c("darkblue","red")) +
+  theme(plot.title = element_text(size=15, face = "bold"),
+        plot.subtitle = element_text(size = 13))
+
+plot5
+```
+
+## Q5
+
+We compare the results of monthly total return index and daily total return index.
+
+Based on the line plots, we can conclude that there is no difference between monthly data and daily data when it comes to how total return index of Microsoft changes over time. The difference is that monthly data is smoother while daily data has more volatility. This can be explained that at higher frequencies (daily), departures from normality are much more severe as the daily data contains more noises compared to monthly data.
+
+```{r comparison of monthly vs daily return,fig.width=10,fig.height=8,message=FALSE,warning=FALSE}
+# compare the monthly and daily total return index 
+plot_msftmd <- ggarrange(
+  plot1, plot4,
+  labels = c("Monthly","    Daily"),
+  legend = "bottom",
+  ncol = 1,
+  label.x = 0.08,
+  vjust = 2,
+  font.label = list(size = 10)
+)
+
+plot_msftmd
+```
+
+Then we look into the distribution of simple return and log return of MSFT on a daily basis.
+
+```{r distribution daily,message=FALSE,warning=FALSE}
+# Q6-calculate the MEAN , VARIANCE, SKEWNESS and KURTOSIS of RET and LRET 
+daily_simple <-MSFT_day %>% 
+  mutate(TICKER = rep("MSFT",nrow(MSFT_day))) %>% 
+  group_by(TICKER) %>% 
+  summarise(mean = mean(RET),
+            variance = var(RET),
+            skewness = skewness(RET),
+            kurtosis = kurtosis(RET))
+
+daily_simple$TICKER[ daily_simple$TICKER == "MSFT"] <-"MSFT_daily_simple"
+
+daily_log <-MSFT_day %>% 
+  mutate(TICKER = rep("MSFT",nrow(MSFT_day))) %>% 
+  group_by(TICKER) %>% 
+  summarise(mean = mean(LRET),
+            variance = var(LRET),
+            skewness = skewness(LRET),
+            kurtosis = kurtosis(LRET))
+
+daily_log$TICKER[ daily_log$TICKER == "MSFT"] <-"MSFT_daily_log"
+
+
+daily_distribution<-daily_log %>%
+  rbind(daily_simple)
+
+daily_distribution
+
+```
+
+Here, we compare the distribution of daily returns with monthly returns.
+
+```{r compare with monthly,message=FALSE,warning=FALSE}
+#Q6 compare distribution metrics daily and monthly
+distribution_compare<-daily_distribution %>%
+  rbind(monthly_distribution)
+
+distribution_compare
+```
+
+## Q6
+
+Based on the table above, if we only compare the simple and returns on a daily basis, we can see the mean and variance are still very similar. Using log return instead of simple return can reduce the skewness and kurtosis, which means make it closer to normal distribution.
+
+Further, if we compare the results with monthly frequency, we can observe that daily return has a much lower mean and variance. The different scales can be explained as how much you can earn by investing in 1 day and 1 month is obviously different. In terms of skewness, daily return is less skewed than monthly and the daily log return is almost perfectly symmetrical. In terms of kurtosis, daily return has an extremely high kurtosis of 8, this indicates that for investors, they will experience occasional extreme returns (either positive or negative), more extreme than the usual + or - three standard deviations from the mean that is predicted by the normal distribution of returns. This phenomenon is known as kurtosis risk.
+
+```{r plot distribution of daily returns,message=FALSE,warning=FALSE}
+# plot the distribution of daily simple and log return of Microsoft
+
+MSFT_day_longer<-  MSFT_day %>% 
+  pivot_longer(cols = c("RET","LRET"),
+                            names_to = "index_type",
+                            values_to = "index") 
+
+  plot6 <- ggplot(MSFT_day_longer,aes(x = index)) +
+#  geom_histogram(bins = 50) +
+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
+ geom_density(alpha=.2, fill="#FF6666")+
+  scale_x_continuous(limits = c(-0.5,0.5)) +
+  facet_wrap(~index_type, ncol = 1)+
+  ggtitle("Comparison of distribution of daily simple return and log return of Microsoft")
+
+plot6
+
+```
+
+```{r compare monthly and daily simple and log return,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
+#compare monthly and daily simple and log return
+ggarrange(
+  plot3, plot6, 
+  ncol = 1,
+  labels = c("Monthly","   Daily"),
+  legend = "bottom",
+  label.x = 0.08,
+  vjust = 2,
+  font.label = list(size = 10)
+)
+
+```
+
+## Q7
+
+A standard normal distribution has a mean of 0, variance of 1, skewness of 0 and kurtosis of 3. As the histograms and density plots show, the empirical distribution of the returns are almost normally distributed. They are slight right-skewed but are more peaked with a heavy tail since they have a very high kurtosis. And at higher frequency(daily), the likelihood of departures from normality is much higher.
+
+```{r compare with normal distribution,fig.width=10,fig.height=8,message=FALSE,warning=FALSE}
+# compare with normal distribution
+plot7 <- ggplot(MSFT_day_longer,aes(x = index)) +
+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins = 50)+
+  #geom_density(alpha=.2,fill="#FF6666",colour="#FF6666")+
+  scale_x_continuous(limits = c(-0.5,0.5)) +
+  stat_function(colour="#FF6666",alpha=3,
+		fun = dnorm, 
+		args = with(MSFT_day_longer,c(mean = mean(index), sd = sd(index)))
+	) + 
+  facet_wrap(~index_type, ncol = 1)+
+  ggtitle("Comparison of distribution of daily simple return and log return of Microsoft with normal distribution")
+
+plot7
+```
+
+# 
