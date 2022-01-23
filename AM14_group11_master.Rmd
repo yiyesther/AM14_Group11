@@ -180,6 +180,36 @@ plot3 +
 
 ```
 
+## Q4
+```{r read data for all stocks,message=FALSE,warning=FALSE}
+daily_return_data <- read_excel(( "PS1_Daily.xlsx"), sheet = "HPR_daily")
+colnames(daily_return_data) <- paste0(daily_return_data[1,], "_RET")
+daily_return_data <- daily_return_data[-1,]
+
+# loading Prices Daily Sheet   
+daily_price_data <- read_excel(("PS1_Daily.xlsx"), sheet = "Prices_daily")
+colnames(daily_price_data) <- paste0(daily_price_data[1,], "_PRICE")
+daily_price_data <- daily_price_data[-1,]
+
+# Joining the HPR and Prices data 
+daily_data <- daily_return_data %>%
+  rename(date = DATE_RET) %>% 
+  left_join(daily_price_data %>% rename(date = DATE_PRICE), by = "date")
+
+# removing the datasets
+rm(daily_return_data, daily_price_data)
+
+# Looking at the final data 
+glimpse(daily_data)
+```
+```{r clean daily data,message=FALSE,warning=FALSE}
+daily_data$date <- ymd(daily_data$date)
+
+# Convert all other columns to numeric 
+daily_data <- daily_data %>% mutate_if(is.character, as.numeric)
+
+```
+
 # Q5 & 6& 7 Daily TRI and LRET
 
 Next, we continue to take a look at daily return of MSFT and GE. Similarly, we calculated the daily total return index and log return. (Q5&6)
@@ -196,6 +226,8 @@ MSFT_day <- PS1_daily %>%
   select(DATE, MSFT, LRET, SPRTRN, return_div,snpreturn) %>% 
   rename(RET = MSFT)
 
+MSFT_day 
+
 
 GE_day <- PS1_daily %>% 
   mutate(DATE = ymd(DATE)) %>% 
@@ -206,6 +238,8 @@ GE_day <- PS1_daily %>%
          ) %>% 
   select(DATE, GE, LRET, SPRTRN, return_div,snpreturn) %>% 
   rename(RET = GE)
+
+GE_day
 ```
 
 ```{r plot MSFT and s&p500 total return index,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
@@ -440,4 +474,120 @@ plot7 +
   labs(title = "Comparison of distribution of daily simple return and log return of Microsoft with normal distribution")
 ```
 
-# 
+## Q8 
+
+We pick three random stocks. Calculate their holding period return, log return and total return.
+
+```{r pick stocks,message=FALSE,warning=FALSE}
+tickers <- c("MSFT", "XOM", "GE", "JPM", "INTC", "C")
+set.seed(1234)
+sample_tickers = sample(tickers, 3)
+
+# Holding period returns
+selection <- daily_data %>% 
+  select(date, starts_with(sample_tickers) & ends_with("RET"), SPRTRN_RET)
+
+# Log return 
+selection_LRET <- as.data.frame(apply(selection %>% 
+                                        select(ends_with("RET")) + 1, MARGIN = 2, FUN = log))
+colnames(selection_LRET) <- c(paste0(sample_tickers, "_LRET"), "SPRTRN_LRET")
+
+# Total return indexes
+selection_VALUE <- as.data.frame(apply(selection %>% 
+                                      select(ends_with("RET")) + 1, MARGIN = 2, FUN = cumprod))
+colnames(selection_VALUE) <- c(paste0(sample_tickers, "_VALUE"), "SPRTRN_VALUE")
+
+# Combining HPR, Log and Total returns
+selection <- selection %>% 
+  cbind(selection_LRET) %>% 
+  cbind(selection_VALUE)
+
+# removing data frames 
+rm(selection_LRET, tickers)
+```
+
+## Q9 
+
+Next we calculate the covariance matrix for log return series, using both return and returns squared.
+
+```{r cov,message=FALSE,warning=FALSE}
+# Correlation matrix for Log returns
+cor(selection %>% 
+      select(ends_with("LRET")))
+```
+
+* There is a high positive between the S%P 500 and the other stocks. All stocks have a positive relationship.
+
+```{r cov2,message=FALSE,warning=FALSE}
+# Correlation matrix Log returns squared
+cor((selection %>% 
+       select(ends_with("LRET")))^2)
+```
+
+## Q10 
+
+Next we plot the ACF for returns, returns squared and absolue returns.
+
+```{r acf,message=FALSE,warning=FALSE}
+for (ticker in c(sample_tickers, "SPRTRN")) {
+  acf(selection %>% select(starts_with(ticker) & ends_with("LRET")), lag.max = 30, main = paste0(ticker, " Log Return"))
+  acf((selection %>% select(starts_with(ticker) & ends_with("LRET")))^2, lag.max = 30, main = paste0(ticker, " Squared Log Return"))
+  acf(abs(selection %>% select(starts_with(ticker) & ends_with("LRET"))), lag.max = 30, main = paste0(ticker, " Absolute Log Return"))
+}
+```
+
+* The graphs can be seen for JPM, XOM, INTC, and  The ACF graph tells us about the coeffecient of correlation betweent two values in a time series.It helps in understanding the degree of similarity between a given time series and a lagged version of itself over successive time interval, measures the relationship between a variable's current value and its past values.The horizontal line represent threshold, the vertical lines exceeding the horizontal line are significant. The spikes at Lag 0 are ignored. The ACF model for JPM, XOM, INTC and SPRTRN have  no major lags in the log return graph, whereas there are positive lags in  squared lag graph and  absolute log return graph.
+
+## Q11 
+
+Next, we assign weights. 
+
+```{r porfolio,message=FALSE,warning=FALSE}
+# assigning portfolio weights
+arbitrary_weights <- c(1/3, 1/3, 1/3)
+
+arbitrary_weights
+
+#portfolio
+portfolio <- selection %>% 
+  select(date, starts_with(sample_tickers) & ends_with("RET") & !ends_with("LRET"))
+
+portfolio
+```
+
+* If keep the weights same then we are exposed to more risks. The potfolio weight should be rebalanced over time, as the stocks do not have fixed returns, this would help in mininmizing risks.
+
+##Q12 
+
+Further we calculate the portfolio returns and plot the result.
+
+```{r picked plot,fig.height=8,fig.width=10,message=FALSE,warning=FALSE}
+# Portfolio return
+portfolio$Portfolio_RET <- as(portfolio %>% 
+                                select(starts_with(sample_tickers)), "matrix") %*% arbitrary_weights
+
+# Portfolio total return index
+portfolio$Portfolio_VALUE <- cumprod(1 + portfolio$Portfolio_RET)
+
+# Single stock total return index
+portfolio <- cbind(portfolio, selection_VALUE %>% select(starts_with(sample_tickers)))
+
+# Plotting
+ggplot(portfolio, aes(x = date)) +
+  geom_line(aes(y = Portfolio_VALUE, color = "Portfolio")) +
+  geom_line(aes(y = JPM_VALUE, color = "JPMorgan")) +
+  geom_line(aes(y = XOM_VALUE, color = "ExxonMobil")) +
+  geom_line(aes(y = INTC_VALUE, color = "Intel")) +
+  scale_colour_manual("", 
+                      breaks = c("Portfolio", "JPMorgan", "ExxonMobil", "Intel"),
+                      values = c("tomato4", "lightyellow2", "palegreen1", "lightblue2")) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  labs(title = "Daily Total Return of Individual Stocks and Portfolio from 1990 to 2015",
+       x = "",
+       y = "Value") +
+  theme(plot.title = element_text(size=15, face = "bold"))
+```
+
+* We get a plot for the three stocks: JP Morgan, ExxonMobil, and Intel. We see through this graph the return we could have obtained if we had invested $1 in the stock. It can be seen that the highest return was for Intel, but we see a  decline after that. Next, we have  ExxonMobil and JP morgan which provide less returns but are more stable.
+
